@@ -1,0 +1,116 @@
+(ns clj-elasticsearch.specs)
+
+(defprotocol PCallAPI
+  (make-api-call [this method-name options] "Use the given ES Client to make an API call"))
+
+(defn make-api-call*
+  [impl client nam options]
+  (if-let [f (impl nam)]
+    (f client options)
+    (let [error-message (format "No implementation found for method %s in client %s" nam client)]
+      (throw (ex-info error-message {:name nam :client client})))))
+
+(defmulti make-client "Makes an ES client from the given type and spec"
+  (fn [type _] type))
+
+(defmulti make-listener "Builds a listener for the given implementation"
+  (fn [type _] (cond
+                (#{:node :transport :native} type) :native
+                (= type :rest) :rest)))
+
+(def global-specs
+  {;; client
+   "org.elasticsearch.action.index.IndexRequest"
+   {:symb 'index-doc :impl :client :constructor [:index] :required [:source :type]
+    :rest-uri [:index :type :id] :rest-method :put/post}
+   "org.elasticsearch.action.search.SearchRequest"
+   {:symb 'search :impl :client :constructor [] :required []
+    :rest-uri [:indices :type "_search"] :rest-method :get
+    :rest-default {:type "_all" :indices "_all"}}
+   "org.elasticsearch.action.get.GetRequest"
+   {:symb 'get-doc :impl :client :constructor [:index] :required [:id]
+    :rest-uri [:index :type :id] :rest-method :get
+    :rest-default {:type "_all"}}
+   "org.elasticsearch.action.count.CountRequest"
+   {:symb 'count-docs :impl :client :constructor [:indices] :required []
+    :rest-uri [:indices :type "_search"] :rest-method :get
+    :rest-default {:type "_all" :indices "_all"}}
+   "org.elasticsearch.action.delete.DeleteRequest"
+   {:symb 'delete-doc :impl :client :constructor [:index :type :id] :required []
+    :rest-uri [:index :type :id] :rest-method :delete}
+   "org.elasticsearch.action.deletebyquery.DeleteByQueryRequest"
+   {:symb 'delete-by-query :impl :client :constructor [] :required [:query]
+    :rest-uri [:index :type "_query"] :rest-method :delete
+    :rest-default {:type "_all" :index "_all"}}
+   "org.elasticsearch.action.mlt.MoreLikeThisRequest"
+   {:symb 'more-like-this :impl :client :constructor [:index] :required [:id :type]
+    :rest-uri [:index :type "_mlt"] :rest-method :get
+    :rest-default {:type "_all" :index "_all"}}
+   "org.elasticsearch.action.percolate.PercolateRequest"
+   {:symb 'percolate :impl :client :constructor [:index :type] :required [:source]
+    :rest-uri [:index :type "_percolate"] :rest-method :get}
+   "org.elasticsearch.action.search.SearchScrollRequest"
+   {:symb 'scroll :impl :client :constructor [:scroll-id] :required []
+    :rest-uri [:index :type "_search" "scroll"] :rest-method :get}
+   ;; for es > 0.20
+   "org.elasticsearch.action.update.UpdateRequest"
+   {:symb 'update-doc :impl :client :constructor [:index :type :id] :required []
+    :rest-uri [:index :type :id "_update"] :rest-method :post}
+
+   ;; indices
+   "org.elasticsearch.action.admin.indices.optimize.OptimizeRequest"
+   {:symb 'optimize-index :impl :indices :constructor [] :required []}
+   "org.elasticsearch.action.admin.indices.analyze.AnalyzeRequest"
+   {:symb 'analyze-request :impl :indices :constructor [:index :text] :required []}
+   "org.elasticsearch.action.admin.indices.cache.clear.ClearIndicesCacheRequest"
+   {:symb 'clear-index-cache :impl :indices :constructor [:indices] :required []}
+   "org.elasticsearch.action.admin.indices.close.CloseIndexRequest"
+   {:symb 'close-index :impl :indices :constructor [:index] :required []}
+   "org.elasticsearch.action.admin.indices.create.CreateIndexRequest"
+   {:symb 'create-index :impl :indices :constructor [:index] :required []}
+   "org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest"
+   {:symb 'delete-index :impl :indices :constructor [:indices] :required []}
+   "org.elasticsearch.action.admin.indices.mapping.delete.DeleteMappingRequest"
+   {:symb 'delete-mapping :impl :indices :constructor [:indices] :required []}
+   "org.elasticsearch.action.admin.indices.template.delete.DeleteIndexTemplateRequest"
+   {:symb 'delete-template :impl :indices :constructor [:name] :required []}
+   ;; for es < 0.20
+   "org.elasticsearch.action.admin.indices.exists.IndicesExistsRequest"
+   {:symb 'exists-index :impl :indices :constructor [:indices] :required []}
+   ;; for es > 0.20
+   "org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest"
+   {:symb 'exists-index :impl :indices :constructor [:indices] :required []}
+   "org.elasticsearch.action.admin.indices.flush.FlushRequest"
+   {:symb 'flush-index :impl :indices :constructor [:indices] :required []}
+   "org.elasticsearch.action.admin.indices.gateway.snapshot.GatewaySnapshotRequest"
+   {:symb 'gateway-snapshot :impl :indices :constructor [:indices] :required []}
+   "org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequest"
+   {:symb 'put-mapping :impl :indices :constructor [:indices] :required []}
+   "org.elasticsearch.action.admin.indices.template.put.PutIndexTemplateRequest"
+   {:symb 'put-template :impl :indices :constructor [:name] :required []}
+   "org.elasticsearch.action.admin.indices.refresh.RefreshRequest"
+   {:symb 'refresh-index :impl :indices :constructor [:indices] :required []}
+   "org.elasticsearch.action.admin.indices.segments.IndicesSegmentsRequest"
+   {:symb 'index-segments :impl :indices :constructor [] :required []}
+   "org.elasticsearch.action.admin.indices.stats.IndicesStatsRequest"
+   {:symb 'index-stats :impl :indices :constructor [] :required []}
+   "org.elasticsearch.action.admin.indices.status.IndicesStatusRequest"
+   {:symb 'index-status :impl :indices :constructor [] :required []}
+   "org.elasticsearch.action.admin.indices.settings.UpdateSettingsRequest"
+   {:symb 'update-index-settings :impl :indices :constructor [:indices] :required []}
+
+   ;; cluster
+   "org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest"
+   {:symb 'cluster-health :impl :cluster :constructor [:indices] :required []}
+   "org.elasticsearch.action.admin.cluster.state.ClusterStateRequest"
+   {:symb 'cluster-state :impl :cluster :constructor [] :required []}
+   "org.elasticsearch.action.admin.cluster.node.info.NodesInfoRequest"
+   {:symb 'node-info :impl :cluster :constructor [] :required []}
+   "org.elasticsearch.action.admin.cluster.node.restart.NodesRestartRequest"
+   {:symb 'node-restart :impl :cluster :constructor [:nodes-ids] :required []}
+   "org.elasticsearch.action.admin.cluster.node.shutdown.NodesShutdownRequest"
+   {:symb 'node-shutdown :impl :cluster :constructor [:nodes-ids] :required []}
+   "org.elasticsearch.action.admin.cluster.node.stats.NodesStatsRequest"
+   {:symb 'nodes-stats :impl :cluster :constructor [:nodes-ids] :required []}
+   "org.elasticsearch.action.admin.cluster.settings.ClusterUpdateSettingsRequest"
+   {:symb 'update-cluster-settings :impl :cluster :constructor [] :required []}})
