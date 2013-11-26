@@ -1,4 +1,5 @@
-(ns clj-elasticsearch.specs)
+(ns clj-elasticsearch.specs
+  (:require [clojure.string :as str]))
 
 (defprotocol PCallAPI
   (make-api-call [this method-name options] "Use the given ES Client to make an API call"))
@@ -17,6 +18,13 @@
   (fn [type _] (cond
                 (#{:node :transport :native} type) :native
                 (= type :rest) :rest)))
+
+(defn parse-json-key
+  [^String k]
+  (-> k
+      (str/replace #"^_" "")
+      (.replace \_ \-)
+      (keyword)))
 
 (def global-specs
   {;; client
