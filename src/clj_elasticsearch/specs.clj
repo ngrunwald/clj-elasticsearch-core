@@ -67,6 +67,13 @@
    "org.elasticsearch.action.update.UpdateRequest"
    {:symb 'update-doc :impl :client :constructor [:index :type :id] :required []
     :rest-uri [:index :type :id "_update"] :rest-method :post}
+   ;; Bulk
+   "org.elasticsearch.action.bulk.BulkRequest"
+   {:symb 'bulk-request :impl :client :constructor [] :required [:actions]
+    :native-impl false
+    :aliases {:index :indices :type :types}
+    :rest-preprocess :bulk-request-body
+    :rest-uri [:indices :types "_bulk"] :rest-method :post}
 
    ;; indices
    "org.elasticsearch.action.admin.indices.optimize.OptimizeRequest"
