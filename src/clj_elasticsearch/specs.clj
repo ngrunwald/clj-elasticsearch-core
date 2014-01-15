@@ -172,7 +172,8 @@
    "org.elasticsearch.action.admin.cluster.node.stats.NodesStatsRequest"
    {:symb 'nodes-stats :impl :cluster :constructor [:nodes-ids] :required []
     :rest-uri ["_cluster" "nodes" :nodes-ids "stats"] :rest-method :get
-    :rest-default {:nodes-ids nil}}
+    :rest-default {:nodes-ids nil}
+    :native-impl false}
    "org.elasticsearch.action.admin.cluster.settings.ClusterUpdateSettingsRequest"
    {:symb 'update-cluster-settings :impl :cluster :constructor [] :required []
     :rest-uri ["_cluster" "settings"] :rest-method :put}})
